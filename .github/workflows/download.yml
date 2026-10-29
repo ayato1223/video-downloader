@@ -16,35 +16,29 @@ jobs:
       - name: リポジトリのチェックアウト
         uses: actions/checkout@v4
 
-      - name: Python & Node.js のセットアップ
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Node.js のセットアップ
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: yt-dlpとFFmpegの最新版をインストール
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade yt-dlp
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-
-      - name: 動画のダウンロード（埋め込み用クライアント回避設定）
+      - name: 動画（.mp4）のダウンロード処理
         run: |
           mkdir -p downloads
-          yt-dlp \
-            --extractor-args "youtube:player_client=ios_embedded,tv_embedded,mweb" \
-            --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" \
-            --no-check-certificates \
-            -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
-            --merge-output-format mp4 \
-            -o "downloads/%(title)s.%(ext)s" \
-            "${{ github.event.inputs.video_url }}"
+          
+          # Cobalt APIを使って直接.mp4を取得
+          RESPONSE=$(curl -s -X POST "https://api.cobalt.tools/api/json" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${{ github.event.inputs.video_url }}\", \"videoQuality\": \"720\"}")
+          
+          # レスポンスからダウンロードURLを抽出
+          DOWNLOAD_URL=$(echo $RESPONSE | jq -r '.url')
+          
+          if [ "$DOWNLOAD_URL" != "null" ] && [ -n "$DOWNLOAD_URL" ]; then
+            echo "ダウンロードURLを取得しました: $DOWNLOAD_URL"
+            curl -L -o "downloads/video.mp4" "$DOWNLOAD_URL"
+          else
+            echo "APIからの取得に失敗しました。"
+            echo "API Response: $RESPONSE"
+            exit 1
+          fi
 
-      - name: ダウンロードした動画を保存（Artifacts）
+      - name: ダウンロードした.mp4動画を保存（Artifacts）
         uses: actions/upload-artifact@v4
         with:
           name: downloaded-video
