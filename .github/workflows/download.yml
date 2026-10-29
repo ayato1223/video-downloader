@@ -21,79 +21,81 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Cobalt APIで.mp4を取得してダウンロード
+      - name: MP4動画の取得・ダウンロード処理
         run: |
           mkdir -p downloads
           
           python -c "
           import urllib.request
           import json
+          import re
           import sys
 
           video_url = '${{ github.event.inputs.video_url }}'
           
-          # 現在稼働中のCobalt APIインスタンス一覧
-          api_instances = [
-              'https://api.cobalt.tools',
-              'https://cobalt.qtf.one',
-              'https://co.wuk.sh'
+          # YouTube Video ID の抽出
+          video_id_match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
+          if not video_id_match:
+              print('無効なYouTube URLです。')
+              sys.exit(1)
+          
+          video_id = video_id_match.group(1)
+          print(f'Target Video ID: {video_id}')
+
+          # 信頼できる Invidious パブリックインスタンス一覧
+          invidious_instances = [
+              'https://inv.nadeko.net',
+              'https://invidious.nerdvpn.de',
+              'https://invidious.flokinet.to',
+              'https://invidious.drgns.space'
           ]
 
           success = False
 
-          for api_url in api_instances:
-              endpoint = api_url if api_url.endswith('/') else api_url + '/'
-              print(f'Trying API instance: {endpoint}')
+          for instance in invidious_instances:
+              api_url = f'{instance}/api/v1/videos/{video_id}'
+              print(f'Trying Invidious instance: {instance}')
               
-              headers = {
-                  'Accept': 'application/json',
-                  'Content-Type': 'application/json',
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-              }
+              req = urllib.request.Request(
+                  api_url,
+                  headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+              )
               
-              # v10 APIで推奨されるパラメータ構成
-              payload = json.dumps({
-                  'url': video_url,
-                  'videoQuality': '720',
-                  'filenamePattern': 'basic'
-              }).encode('utf-8')
-
-              req = urllib.request.Request(endpoint, data=payload, headers=headers, method='POST')
               try:
-                  with urllib.request.urlopen(req, timeout=20) as response:
-                      res = json.loads(response.read().decode('utf-8'))
+                  with urllib.request.urlopen(req, timeout=15) as response:
+                      data = json.loads(response.read().decode('utf-8'))
                       
-                      # レスポンスのstatusを確認
-                      status = res.get('status')
-                      print(f'Response status from {endpoint}: {status}')
+                      # MP4フォーマット（音声+映像付き）を検索
+                      format_streams = data.get('formatStreams', [])
                       
-                      download_url = None
-                      if status in ['tunnel', 'redirect']:
-                          download_url = res.get('url')
-                      elif status == 'picker':
-                          # 複数ストリームがある場合は最初の動画を取得
-                          picker = res.get('picker', [])
-                          if picker and 'url' in picker[0]:
-                              download_url = picker[0]['url']
+                      # 720p または 利用可能な最高のMP4ストリームを選択
+                      target_stream = None
+                      for fmt in format_streams:
+                          if fmt.get('container') == 'mp4':
+                              target_stream = fmt
+                              if fmt.get('qualityLabel') == '720p':
+                                  break
                       
-                      if download_url:
-                          print('Found download URL:', download_url)
+                      if target_stream and 'url' in target_stream:
+                          dl_url = target_stream['url']
+                          print('Found valid MP4 stream! Downloading...')
                           
-                          # 動画ファイルのダウンロード
-                          dl_req = urllib.request.Request(download_url, headers={'User-Agent': headers['User-Agent']})
-                          with urllib.request.urlopen(dl_req, timeout=60) as dl_res, open('downloads/video.mp4', 'wb') as f:
+                          dl_req = urllib.request.Request(
+                              dl_url,
+                              headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                          )
+                          
+                          with urllib.request.urlopen(dl_req, timeout=120) as dl_res, open('downloads/video.mp4', 'wb') as f:
                               f.write(dl_res.read())
                           
-                          print('Download Completed!')
+                          print('Download Completed Successfully!')
                           success = True
                           break
-                      else:
-                          print(f'No valid download URL in response: {res}')
               except Exception as e:
-                  print(f'Failed on {endpoint}: {e}')
+                  print(f'Failed on {instance}: {e}')
 
           if not success:
-              print('All API instances failed.')
+              print('All instances failed.')
               sys.exit(1)
           "
 
