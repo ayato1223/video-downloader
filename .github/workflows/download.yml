@@ -21,86 +21,26 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: MP4動画の取得・ダウンロード処理
+      - name: yt-dlpのインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade yt-dlp
+
+      - name: MP4動画の取得処理
         run: |
           mkdir -p downloads
           
-          python -c "
-          import urllib.request
-          import json
-          import re
-          import sys
-
-          video_url = '${{ github.event.inputs.video_url }}'
-          
-          # YouTube Video ID の抽出
-          video_id_match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
-          if not video_id_match:
-              print('無効なYouTube URLです。')
-              sys.exit(1)
-          
-          video_id = video_id_match.group(1)
-          print(f'Target Video ID: {video_id}')
-
-          # 信頼できる Invidious パブリックインスタンス一覧
-          invidious_instances = [
-              'https://inv.nadeko.net',
-              'https://invidious.nerdvpn.de',
-              'https://invidious.flokinet.to',
-              'https://invidious.drgns.space'
-          ]
-
-          success = False
-
-          for instance in invidious_instances:
-              api_url = f'{instance}/api/v1/videos/{video_id}'
-              print(f'Trying Invidious instance: {instance}')
-              
-              req = urllib.request.Request(
-                  api_url,
-                  headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-              )
-              
-              try:
-                  with urllib.request.urlopen(req, timeout=15) as response:
-                      data = json.loads(response.read().decode('utf-8'))
-                      
-                      # MP4フォーマット（音声+映像付き）を検索
-                      format_streams = data.get('formatStreams', [])
-                      
-                      # 720p または 利用可能な最高のMP4ストリームを選択
-                      target_stream = None
-                      for fmt in format_streams:
-                          if fmt.get('container') == 'mp4':
-                              target_stream = fmt
-                              if fmt.get('qualityLabel') == '720p':
-                                  break
-                      
-                      if target_stream and 'url' in target_stream:
-                          dl_url = target_stream['url']
-                          print('Found valid MP4 stream! Downloading...')
-                          
-                          dl_req = urllib.request.Request(
-                              dl_url,
-                              headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-                          )
-                          
-                          with urllib.request.urlopen(dl_req, timeout=120) as dl_res, open('downloads/video.mp4', 'wb') as f:
-                              f.write(dl_res.read())
-                          
-                          print('Download Completed Successfully!')
-                          success = True
-                          break
-              except Exception as e:
-                  print(f'Failed on {instance}: {e}')
-
-          if not success:
-              print('All instances failed.')
-              sys.exit(1)
-          "
+          # ポータブルな形式でmp4を取得（プロキシ不要・軽量設定）
+          yt-dlp \
+            --no-warnings \
+            --no-check-certificates \
+            -f "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" \
+            --extractor-args "youtube:player_client=android" \
+            -o "downloads/video.mp4" \
+            "${{ github.event.inputs.video_url }}"
 
       - name: ダウンロードした.mp4動画を保存（Artifacts）
         uses: actions/upload-artifact@v4
         with:
           name: downloaded-video
-          path: downloads/
+          path: downloads/video.mp4
