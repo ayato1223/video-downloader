@@ -1,0 +1,39 @@
+name: YouTube Video Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'ダウンロードしたいYouTubeのURLを入力'
+        required: true
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonのセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: yt-dlpとFFmpegのインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install yt-dlp
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: 動画のダウンロード（MP4形式）
+        run: |
+          mkdir -p downloads
+          yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "downloads/%(title)s.%(ext)s" "${{ github.event.inputs.video_url }}"
+
+      - name: ダウンロードした動画を保存（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: downloaded-video
+          path: downloads/
