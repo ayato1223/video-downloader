@@ -28,36 +28,58 @@ jobs:
           python -c "
           import urllib.request
           import json
+          import sys
 
-          url = '${{ github.event.inputs.video_url }}'
-          api_url = 'https://api.cobalt.tools/'
+          video_url = '${{ github.event.inputs.video_url }}'
           
-          headers = {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-          }
-          data = json.dumps({
-              'url': url,
-              'videoQuality': '720'
-          }).encode('utf-8')
+          # 利用可能なCobalt APIのインスタンス一覧
+          api_instances = [
+              'https://api.cobalt.tools',
+              'https://cobalt-api.kwippy.com',
+              'https://cobalt.kwippy.com/api'
+          ]
 
-          req = urllib.request.Request(api_url, data=data, headers=headers, method='POST')
-          try:
-              with urllib.request.urlopen(req) as response:
-                  res = json.loads(response.read().decode('utf-8'))
-                  print('API Response:', res)
-                  
-                  download_url = res.get('url')
-                  if download_url:
-                      print('Downloading .mp4...')
-                      urllib.request.urlretrieve(download_url, 'downloads/video.mp4')
-                      print('Download Completed!')
-                  else:
-                      print('Failed to get download URL from response')
-                      exit(1)
-          except Exception as e:
-              print('Error:', e)
-              exit(1)
+          success = False
+
+          for api_url in api_instances:
+              print(f'Trying API instance: {api_url}')
+              
+              headers = {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                  'Origin': 'https://cobalt.tools',
+                  'Referer': 'https://cobalt.tools/'
+              }
+              
+              payload = json.dumps({
+                  'url': video_url,
+                  'videoQuality': '720'
+              }).encode('utf-8')
+
+              req = urllib.request.Request(api_url, data=payload, headers=headers, method='POST')
+              try:
+                  with urllib.request.urlopen(req, timeout=15) as response:
+                      res = json.loads(response.read().decode('utf-8'))
+                      download_url = res.get('url')
+                      
+                      if download_url:
+                          print('Found download URL:', download_url)
+                          
+                          # 動画ファイルをストリーミングダウンロード
+                          dl_req = urllib.request.Request(download_url, headers={'User-Agent': headers['User-Agent']})
+                          with urllib.request.urlopen(dl_req) as dl_res, open('downloads/video.mp4', 'wb') as f:
+                              f.write(dl_res.read())
+                          
+                          print('Download Completed!')
+                          success = True
+                          break
+              except Exception as e:
+                  print(f'Failed on {api_url}: {e}')
+
+          if not success:
+              print('All API instances failed.')
+              sys.exit(1)
           "
 
       - name: ダウンロードした.mp4動画を保存（Artifacts）
