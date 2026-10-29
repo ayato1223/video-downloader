@@ -16,27 +16,49 @@ jobs:
       - name: リポジトリのチェックアウト
         uses: actions/checkout@v4
 
-      - name: 動画（.mp4）のダウンロード処理
+      - name: Pythonのセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Cobalt APIで.mp4を取得してダウンロード
         run: |
           mkdir -p downloads
           
-          # Cobalt APIを使って直接.mp4を取得
-          RESPONSE=$(curl -s -X POST "https://api.cobalt.tools/api/json" \
-            -H "Accept: application/json" \
-            -H "Content-Type: application/json" \
-            -d "{\"url\": \"${{ github.event.inputs.video_url }}\", \"videoQuality\": \"720\"}")
+          # PythonスクリプトでCobalt APIを呼び出し、URLを取得
+          python -c "
+          import urllib.request
+          import json
+          import os
+
+          url = '${{ github.event.inputs.video_url }}'
+          api_url = 'https://api.cobalt.tools/'
           
-          # レスポンスからダウンロードURLを抽出
-          DOWNLOAD_URL=$(echo $RESPONSE | jq -r '.url')
-          
-          if [ "$DOWNLOAD_URL" != "null" ] && [ -n "$DOWNLOAD_URL" ]; then
-            echo "ダウンロードURLを取得しました: $DOWNLOAD_URL"
-            curl -L -o "downloads/video.mp4" "$DOWNLOAD_URL"
-          else
-            echo "APIからの取得に失敗しました。"
-            echo "API Response: $RESPONSE"
-            exit 1
-          fi
+          headers = {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+          }
+          data = json.dumps({'url': url, 'videoQuality': '720'}).encode('utf-8')
+
+          req = urllib.request.Request(api_url, data=data, headers=headers, method='POST')
+          try:
+              with urllib.request.urlopen(req) as response:
+                  res = json.loads(response.read().decode('utf-8'))
+                  print('API Response:', res)
+                  
+                  download_url = res.get('url')
+                  if download_url:
+                      print('Downloading from:', download_url)
+                      urllib.request.urlretrieve(download_url, 'downloads/video.mp4')
+                      print('Download completed!')
+                  else:
+                      print('No URL in response:', res)
+                      exit(1)
+          except Exception as e:
+              print('Error:', e)
+              exit(1)
+          "
 
       - name: ダウンロードした.mp4動画を保存（Artifacts）
         uses: actions/upload-artifact@v4
