@@ -25,21 +25,21 @@ jobs:
         run: |
           mkdir -p downloads
           
-          # PythonスクリプトでCobalt APIを呼び出し、URLを取得
           python -c "
           import urllib.request
           import json
-          import os
 
           url = '${{ github.event.inputs.video_url }}'
           api_url = 'https://api.cobalt.tools/'
           
           headers = {
               'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+              'Content-Type': 'application/json'
           }
-          data = json.dumps({'url': url, 'videoQuality': '720'}).encode('utf-8')
+          data = json.dumps({
+              'url': url,
+              'videoQuality': '720'
+          }).encode('utf-8')
 
           req = urllib.request.Request(api_url, data=data, headers=headers, method='POST')
           try:
@@ -49,11 +49,11 @@ jobs:
                   
                   download_url = res.get('url')
                   if download_url:
-                      print('Downloading from:', download_url)
+                      print('Downloading .mp4...')
                       urllib.request.urlretrieve(download_url, 'downloads/video.mp4')
-                      print('Download completed!')
+                      print('Download Completed!')
                   else:
-                      print('No URL in response:', res)
+                      print('Failed to get download URL from response')
                       exit(1)
           except Exception as e:
               print('Error:', e)
