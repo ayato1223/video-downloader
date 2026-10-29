@@ -32,13 +32,14 @@ jobs:
           pip install --upgrade yt-dlp
           sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: 動画のダウンロード（複数クライアント試行設定）
+      - name: 動画のダウンロード（埋め込み用クライアント回避設定）
         run: |
           mkdir -p downloads
           yt-dlp \
-            --extractor-args "youtube:player_client=ios,web_creator,mweb,tv" \
+            --extractor-args "youtube:player_client=ios_embedded,tv_embedded,mweb" \
+            --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" \
             --no-check-certificates \
-            -f "best[ext=mp4]/bestvideo+bestaudio/best" \
+            -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
             --merge-output-format mp4 \
             -o "downloads/%(title)s.%(ext)s" \
             "${{ github.event.inputs.video_url }}"
