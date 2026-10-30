@@ -1,46 +1,43 @@
-name: YouTube Video Downloader
+name: Download YouTube Video
 
 on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'ダウンロードしたいYouTubeのURLを入力'
+        description: 'YouTube Video URL'
         required: true
         type: string
 
 jobs:
   download:
     runs-on: ubuntu-latest
-
     steps:
-      - name: リポジトリのチェックアウト
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Pythonのセットアップ
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: yt-dlpのインストール
+      - name: Install yt-dlp
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade yt-dlp
+          pip install yt-dlp
 
-      - name: MP4動画の取得処理
+      - name: Save Cookie from Secrets
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
-          mkdir -p downloads
-          
-          # ポータブルな形式でmp4を取得（プロキシ不要・軽量設定）
-          yt-dlp \
-            --no-warnings \
-            --no-check-certificates \
-            -f "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" \
-            --extractor-args "youtube:player_client=android" \
-            -o "downloads/video.mp4" \
-            "${{ github.event.inputs.video_url }}"
+          echo "$YOUTUBE_COOKIES" > cookies.txt
 
-      - name: ダウンロードした.mp4動画を保存（Artifacts）
+      - name: Download Video (.mp4)
+        run: |
+          yt-dlp --cookies cookies.txt -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" -o "downloaded_video.mp4" "${{ inputs.video_url }}"
+
+      - name: Upload Video Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: downloaded-video
-          path: downloads/video.mp4
+          name: youtube-video
+          path: downloaded_video.mp4
+          retention-days: 1
