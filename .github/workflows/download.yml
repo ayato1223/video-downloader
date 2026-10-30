@@ -35,30 +35,44 @@ jobs:
       - name: Download Video via Python yt-dlp
         run: |
           python3 -c '
-          import yt_dlp
+          import yt_dlp, sys
 
           url = "${{ inputs.video_url }}"
 
-          ydl_opts = {
-              "cookiefile": "cookies.txt",
-              "format": "bestvideo+bestaudio/best",
-              "outtmpl": "downloaded_video.%(ext)s",
-              "merge_output_format": "mp4",
-              "extractor_args": {
-                  "youtube": {
-                      "player_client": ["tv"],
-                      "player_skip": ["webpage", "configs"]
-                  }
-              },
-              "nocheckcertificate": True,
-              "ignoreerrors": False,
-              "logtostderr": False,
-              "quiet": False,
-          }
+          # クラウドIP制限を回避するための段階的クライアントリスト
+          client_configs = [
+              ["tv"],
+              ["tv_embedded", "web_embedded"],
+              ["mweb", "web"],
+              ["android"]
+          ]
 
-          with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-              print(f"Downloading: {url}")
-              ydl.download([url])
+          success = False
+          for clients in client_configs:
+              print(f"=== Trying player_client: {clients} ===")
+              ydl_opts = {
+                  "cookiefile": "cookies.txt",
+                  "format": "bv*+ba/b/best",
+                  "outtmpl": "downloaded_video.%(ext)s",
+                  "merge_output_format": "mp4",
+                  "extractor_args": {
+                      "youtube": {
+                          "player_client": clients
+                      }
+                  },
+                  "quiet": False,
+              }
+              try:
+                  with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                      ydl.download([url])
+                  success = True
+                  print("Download completed successfully!")
+                  break
+              except Exception as e:
+                  print(f"Attempt failed with {clients}: {e}")
+
+          if not success:
+              sys.exit(1)
           '
 
       - name: Upload Video Artifact
