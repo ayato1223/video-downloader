@@ -35,41 +35,28 @@ jobs:
       - name: Download Video via Python yt-dlp
         run: |
           python3 -c '
-          import os, sys, yt_dlp
+          import yt_dlp
 
           url = "${{ inputs.video_url }}"
-          
-          # コピー用オプション（WebEmbedded経由でSABR/BOT制限を完全回避）
+
           ydl_opts = {
-              "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-              "outtmpl": "downloaded_video.mp4",
+              "format": "best",
+              "outtmpl": "downloaded_video.%(ext)s",
               "cookiefile": "cookies.txt",
               "extractor_args": {
                   "youtube": {
-                      "player_client": ["web_embedded", "tv_embedded", "android_vr"],
-                      "skip": ["hls", "dash"]
+                      "player_client": ["android_vr", "web_embedded", "tv_embedded"]
                   }
               },
-              "merge_output_format": "mp4",
-              "quiet": False,
+              "postprocessors": [{
+                  "key": "FFmpegVideoConvertor",
+                  "preferedformat": "mp4",
+              }],
           }
 
-          try:
-              with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                  print(f"Downloading: {url}")
-                  ydl.download([url])
-              print("Download completed successfully!")
-          except Exception as e:
-              print(f"Primary method failed: {e}")
-              # フォールバック（Webベース最高画質）
-              ydl_opts_fallback = {
-                  "format": "b/bv*+ba",
-                  "outtmpl": "downloaded_video.mp4",
-                  "cookiefile": "cookies.txt",
-                  "merge_output_format": "mp4",
-              }
-              with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
-                  ydl.download([url])
+          with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+              print(f"Downloading: {url}")
+              ydl.download([url])
           '
 
       - name: Upload Video Artifact
