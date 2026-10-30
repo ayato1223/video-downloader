@@ -1,144 +1,111 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Video Downloader</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-    }
-    .card {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 480px;
-      text-align: center;
-    }
-    h1 {
-      font-size: 1.5rem;
-      color: #333;
-      margin-bottom: 20px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      box-sizing: border-box;
-      margin-bottom: 15px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input[type="text"]:focus {
-      border-color: #ff0000;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background-color: #ff0000;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    button:hover {
-      background-color: #cc0000;
-    }
-    button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
-    #status {
-      margin-top: 15px;
-      font-size: 14px;
-      color: #666;
-      word-break: break-all;
-    }
-    .dl-btn {
-      display: inline-block;
-      margin-top: 15px;
-      padding: 12px 20px;
-      background-color: #28a745;
-      color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: bold;
-    }
-    .dl-btn:hover {
-      background-color: #218838;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #ff0000;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #cc0000;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+            word-break: break-all;
+        }
+        .dl-btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 12px 20px;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .dl-btn:hover {
+            background-color: #218838;
+        }
+    </style>
 </head>
 <body>
+    <div class="card">
+        <h1>🎬 YouTube 動画ダウンロード</h1>
+        <input type="text" id="videoUrl" placeholder="YouTubeのURLを貼り付け (例: https://...)" />
+        <button id="convertBtn" onclick="fetchDownloadLink()">動画を変換する</button>
+        <div id="status"></div>
+        <div id="downloadArea"></div>
+    </div>
 
-  <div class="card">
-    <h1>🎬 YouTube 動画ダウンロード</h1>
-    <input type="text" id="videoUrl" placeholder="YouTubeのURLを貼り付け (例: https://www.youtube.com/watch?v=...)" />
-    <button id="convertBtn" onclick="fetchDownloadLink()">動画を変換する</button>
-    
-    <div id="status"></div>
-    <div id="downloadArea"></div>
-  </div>
+    <script>
+        async function fetchDownloadLink() {
+            const urlInput = document.getElementById('videoUrl').value.trim();
+            const status = document.getElementById('status');
+            const downloadArea = document.getElementById('downloadArea');
+            const btn = document.getElementById('convertBtn');
 
-  <script>
-    async function fetchDownloadLink() {
-      const urlInput = document.getElementById('videoUrl').value.trim();
-      const status = document.getElementById('status');
-      const downloadArea = document.getElementById('downloadArea');
-      const btn = document.getElementById('convertBtn');
+            if (!urlInput) {
+                status.innerText = '❌ URLを入力してください。';
+                return;
+            }
 
-      if (!urlInput) {
-        status.innerText = '❌ URLを入力してください。';
-        return;
-      }
-
-      status.innerText = '⏳ 変換URLを取得中...';
-      downloadArea.innerHTML = '';
-      btn.disabled = true;
-
-      try {
-        // CobaltパブリックAPI（ブラウザ直接通信経由）
-        const response = await fetch('https://api.cobalt.tools/', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: urlInput,
-            videoQuality: '720'
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.url) {
-          status.innerText = '✅ 準備が完了しました！';
-          downloadArea.innerHTML = `<a class="dl-btn" href="${data.url}" target="_blank" download="video.mp4">📥 .mp4 をダウンロード</a>`;
-        } else {
-          status.innerText = '❌ 動画の取得に失敗しました。別の動画URLでお試しください。';
+            status.innerText = '⏳ GitHub Actionsの「Actions」タブから Run workflow を実行してダウンロードしてください。';
+            downloadArea.innerHTML = '';
         }
-      } catch (err) {
-        console.error(err);
-        status.innerText = '❌ エラーが発生しました。通信が制限されているか、外部APIが混雑しています。';
-      } finally {
-        btn.disabled = false;
-      }
-    }
-  </script>
-
+    </script>
 </body>
 </html>
