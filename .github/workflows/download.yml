@@ -25,11 +25,11 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Install dependencies
+      - name: Install dependencies & ffmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
           python -m pip install --upgrade pip
-          pip install -U yt-dlp
+          pip install -U "yt-dlp[default]"
 
       - name: Save Cookie from Secrets
         env:
@@ -52,7 +52,7 @@ jobs:
               "js_runtimes": ["deno"],
               "extractor_args": {
                   "youtube": {
-                      "player_client": ["web", "mweb", "tv"]
+                      "player_client": ["tv", "web_embedded", "mweb"]
                   }
               },
               "quiet": False,
@@ -64,7 +64,7 @@ jobs:
                   ydl.download([url])
               print("Download completed successfully!")
           except Exception as e:
-              print(f"Download failed: {e}")
+              print(f"Download error: {e}")
               sys.exit(1)
           '
 
