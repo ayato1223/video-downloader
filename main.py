@@ -5,7 +5,7 @@ import yt_dlp
 
 app = FastAPI()
 
-# GitHub Pagesからのアクセスを許可（CORS設定）
+# GitHub Pages等からのアクセスを全許可（CORS設定）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,14 +21,19 @@ class VideoRequest(BaseModel):
 def get_download_link(req: VideoRequest):
     try:
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bv*+ba/b/best',
             'quiet': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['tv', 'web_embedded', 'mweb']
+                }
+            }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(req.url, download=False)
-            download_url = info.get('url')
-            title = info.get('title')
-            
+            download_url = info.get('url') or (info.get('requested_formats', [{}])[0].get('url'))
+            title = info.get('title', 'youtube_video')
+
             return {
                 "status": "success",
                 "title": title,
