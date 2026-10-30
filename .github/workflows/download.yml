@@ -12,25 +12,58 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Video via Cobalt API
+      - name: Download Video via Multi-API Fallback
         run: |
-          # Cobalt APIに動画URLを送信してダウンロード直リンクを取得
+          URL="${{ inputs.video_url }}"
+          
+          # 動画IDの抽出
+          VIDEO_ID=$(echo "$URL" | grep -oP '(?:v=|\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})' | head -n 1 | tr -d '/=embedshorts')
+          if [ -z "$VIDEO_ID" ]; then
+            VIDEO_ID="$URL"
+          fi
+          echo "Target Video ID: $VIDEO_ID"
+
+          # --- Route 1: Cobalt API ---
+          echo "=== Trying Route 1: Cobalt API ==="
           RESPONSE=$(curl -s -X POST "https://api.cobalt.tools/" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
-            -d "{\"url\": \"${{ inputs.video_url }}\", \"videoQuality\": \"max\"}")
+            -d "{\"url\": \"https://www.youtube.com/watch?v=${VIDEO_ID}\"}")
+          
+          DL_URL=$(echo "$RESPONSE" | grep -oP '"url"\s*:\s*"\K[^"]+' | sed 's/\\//g')
 
-          # レスポンスからダウンロードURLを抽出
-          DOWNLOAD_URL=$(echo "$RESPONSE" | grep -oP '"url"\s*:\s*"\K[^"]+')
+          if [ -n "$DL_URL" ]; then
+            echo "Successfully got URL from Cobalt API!"
+            curl -L "$DL_URL" -o "downloaded_video.mp4"
+            exit 0
+          fi
+          echo "Cobalt API failed. Response was: $RESPONSE"
 
-          if [ -z "$DOWNLOAD_URL" ]; then
-            echo "Failed to get download URL from API"
-            echo "Response: $RESPONSE"
-            exit 1
+          # --- Route 2: Piped API ---
+          echo "=== Trying Route 2: Piped API ==="
+          PIPED_RESP=$(curl -s "https://pipedapi.kavin.rocks/streams/${VIDEO_ID}")
+          DL_URL=$(echo "$PIPED_RESP" | grep -oP '"url"\s*:\s*"\K[^"]+' | grep "mime=video" | head -n 1 | sed 's/\\//g')
+
+          if [ -n "$DL_URL" ]; then
+            echo "Successfully got URL from Piped API!"
+            curl -L "$DL_URL" -o "downloaded_video.mp4"
+            exit 0
+          fi
+          echo "Piped API failed."
+
+          # --- Route 3: Invidious API ---
+          echo "=== Trying Route 3: Invidious API ==="
+          INVIDIOUS_RESP=$(curl -s "https://inv.tux.pizza/api/v1/videos/${VIDEO_ID}")
+          DL_URL=$(echo "$INVIDIOUS_RESP" | grep -oP '"url"\s*:\s*"\K[^"]+' | grep "googlevideo" | head -n 1 | sed 's/\\//g')
+
+          if [ -n "$DL_URL" ]; then
+            echo "Successfully got URL from Invidious API!"
+            curl -L "$DL_URL" -o "downloaded_video.mp4"
+            exit 0
           fi
 
-          echo "Downloading video from: $DOWNLOAD_URL"
-          curl -L "$DOWNLOAD_URL" -o "downloaded_video.mp4"
+          echo "All routes failed to fetch video URL."
+          exit 1
 
       - name: Upload Video Artifact
         uses: actions/upload-artifact@v4
