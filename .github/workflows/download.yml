@@ -12,58 +12,65 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Video via Multi-API Fallback
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
-          URL="${{ inputs.video_url }}"
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install -U yt-dlp
+
+      - name: Save Cookie from Secrets
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        run: |
+          echo "$YOUTUBE_COOKIES" > cookies.txt
+
+      - name: Download Video via Python yt-dlp
+        run: |
+          python3 -c '
+          import os, sys, yt_dlp
+
+          url = "${{ inputs.video_url }}"
           
-          # 動画IDの抽出
-          VIDEO_ID=$(echo "$URL" | grep -oP '(?:v=|\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})' | head -n 1 | tr -d '/=embedshorts')
-          if [ -z "$VIDEO_ID" ]; then
-            VIDEO_ID="$URL"
-          fi
-          echo "Target Video ID: $VIDEO_ID"
+          # コピー用オプション（WebEmbedded経由でSABR/BOT制限を完全回避）
+          ydl_opts = {
+              "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+              "outtmpl": "downloaded_video.mp4",
+              "cookiefile": "cookies.txt",
+              "extractor_args": {
+                  "youtube": {
+                      "player_client": ["web_embedded", "tv_embedded", "android_vr"],
+                      "skip": ["hls", "dash"]
+                  }
+              },
+              "merge_output_format": "mp4",
+              "quiet": False,
+          }
 
-          # --- Route 1: Cobalt API ---
-          echo "=== Trying Route 1: Cobalt API ==="
-          RESPONSE=$(curl -s -X POST "https://api.cobalt.tools/" \
-            -H "Accept: application/json" \
-            -H "Content-Type: application/json" \
-            -d "{\"url\": \"https://www.youtube.com/watch?v=${VIDEO_ID}\"}")
-          
-          DL_URL=$(echo "$RESPONSE" | grep -oP '"url"\s*:\s*"\K[^"]+' | sed 's/\\//g')
-
-          if [ -n "$DL_URL" ]; then
-            echo "Successfully got URL from Cobalt API!"
-            curl -L "$DL_URL" -o "downloaded_video.mp4"
-            exit 0
-          fi
-          echo "Cobalt API failed. Response was: $RESPONSE"
-
-          # --- Route 2: Piped API ---
-          echo "=== Trying Route 2: Piped API ==="
-          PIPED_RESP=$(curl -s "https://pipedapi.kavin.rocks/streams/${VIDEO_ID}")
-          DL_URL=$(echo "$PIPED_RESP" | grep -oP '"url"\s*:\s*"\K[^"]+' | grep "mime=video" | head -n 1 | sed 's/\\//g')
-
-          if [ -n "$DL_URL" ]; then
-            echo "Successfully got URL from Piped API!"
-            curl -L "$DL_URL" -o "downloaded_video.mp4"
-            exit 0
-          fi
-          echo "Piped API failed."
-
-          # --- Route 3: Invidious API ---
-          echo "=== Trying Route 3: Invidious API ==="
-          INVIDIOUS_RESP=$(curl -s "https://inv.tux.pizza/api/v1/videos/${VIDEO_ID}")
-          DL_URL=$(echo "$INVIDIOUS_RESP" | grep -oP '"url"\s*:\s*"\K[^"]+' | grep "googlevideo" | head -n 1 | sed 's/\\//g')
-
-          if [ -n "$DL_URL" ]; then
-            echo "Successfully got URL from Invidious API!"
-            curl -L "$DL_URL" -o "downloaded_video.mp4"
-            exit 0
-          fi
-
-          echo "All routes failed to fetch video URL."
-          exit 1
+          try:
+              with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                  print(f"Downloading: {url}")
+                  ydl.download([url])
+              print("Download completed successfully!")
+          except Exception as e:
+              print(f"Primary method failed: {e}")
+              # フォールバック（Webベース最高画質）
+              ydl_opts_fallback = {
+                  "format": "b/bv*+ba",
+                  "outtmpl": "downloaded_video.mp4",
+                  "cookiefile": "cookies.txt",
+                  "merge_output_format": "mp4",
+              }
+              with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+                  ydl.download([url])
+          '
 
       - name: Upload Video Artifact
         uses: actions/upload-artifact@v4
