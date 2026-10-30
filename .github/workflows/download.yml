@@ -18,18 +18,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install yt-dlp & ffmpeg
+      - name: Install yt-dlp & dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
           python -m pip install --upgrade pip
-          pip install -U yt-dlp
+          pip install -U "yt-dlp[default]"
 
       - name: Save Cookie from Secrets
         env:
@@ -40,8 +40,9 @@ jobs:
       - name: Download Video (.mp4)
         run: |
           yt-dlp --cookies cookies.txt \
-            --extractor-args "youtube:player_client=web,android" \
-            -f "bv*+ba/b" \
+            --extractor-args "youtube:player_client=mweb,web" \
+            --compat-options no-youtube-unavailable-videos \
+            -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
             --merge-output-format mp4 \
             -o "downloaded_video.mp4" "${{ inputs.video_url }}"
 
