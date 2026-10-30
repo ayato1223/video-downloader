@@ -12,38 +12,25 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install yt-dlp & ffmpeg
+      - name: Download Video via Cobalt API
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          python -m pip install --upgrade pip
-          pip install -U "yt-dlp[default]"
+          # Cobalt APIに動画URLを送信してダウンロード直リンクを取得
+          RESPONSE=$(curl -s -X POST "https://api.cobalt.tools/" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${{ inputs.video_url }}\", \"videoQuality\": \"max\"}")
 
-      - name: Save Cookie from Secrets
-        env:
-          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
-        run: |
-          echo "$YOUTUBE_COOKIES" > cookies.txt
+          # レスポンスからダウンロードURLを抽出
+          DOWNLOAD_URL=$(echo "$RESPONSE" | grep -oP '"url"\s*:\s*"\K[^"]+')
 
-      - name: Download Video (.mp4)
-        run: |
-          yt-dlp --cookies cookies.txt \
-            --extractor-args "youtube:player_client=android_vr,web_embedded,tv_embedded" \
-            -f "b/bv*+ba" \
-            --merge-output-format mp4 \
-            -o "downloaded_video.mp4" "${{ inputs.video_url }}"
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "Failed to get download URL from API"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          echo "Downloading video from: $DOWNLOAD_URL"
+          curl -L "$DOWNLOAD_URL" -o "downloaded_video.mp4"
 
       - name: Upload Video Artifact
         uses: actions/upload-artifact@v4
