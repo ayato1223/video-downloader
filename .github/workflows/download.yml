@@ -20,8 +20,9 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install yt-dlp
+      - name: Install yt-dlp & ffmpeg
         run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
           python -m pip install --upgrade pip
           pip install -U yt-dlp
 
@@ -36,7 +37,8 @@ jobs:
           yt-dlp --cookies cookies.txt \
             --extractor-args "youtube:player_client=ios,android,web" \
             --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" \
-            -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
+            -f "bv*+ba/b" \
+            --merge-output-format mp4 \
             -o "downloaded_video.mp4" "${{ inputs.video_url }}"
 
       - name: Upload Video Artifact
