@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install yt-dlp & dependencies
+      - name: Install yt-dlp & ffmpeg
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
           python -m pip install --upgrade pip
@@ -40,9 +40,8 @@ jobs:
       - name: Download Video (.mp4)
         run: |
           yt-dlp --cookies cookies.txt \
-            --extractor-args "youtube:player_client=tv,ios" \
-            --user-agent "Mozilla/5.0 (SmartTV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36" \
-            -f "bv*+ba/b" \
+            --extractor-args "youtube:player_client=android_vr,web_embedded,tv_embedded" \
+            -f "b/bv*+ba" \
             --merge-output-format mp4 \
             -o "downloaded_video.mp4" "${{ inputs.video_url }}"
 
